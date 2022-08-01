@@ -1,0 +1,154 @@
+import json
+import os
+import re
+import requests
+from bs4 import BeautifulSoup
+#json   question   answer   url  keywords  category_path   picture
+headers={'user_agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.62'}
+url='https://www.51test.net/show/9485031.html'
+#url='https://m.cmpx.com.cn/jingdianfanwen/167831.html'
+json_path=r"D:\Postgratuate\Data_coll\new.json"
+
+def get_html(url):
+    try:
+        r=requests.get(url)
+        r.encoding=r.apparent_encoding
+        data=r.text
+    except:
+        print('error1')
+    return data
+
+def get_tag(data):
+    try:
+        soup=BeautifulSoup(data,'html.parser')
+        content=soup.find_all('p')
+    except:
+        print('error2')
+    return content
+
+def read_json(json_path):
+    with open(json_path,'r') as f:
+        str=f.read()
+        data=json.loads(str)
+        return data
+
+def delete_idx(str):
+    idx=0
+    for i in str:
+        if(i!='、'):
+            idx=idx+1
+        else:
+            break
+    return str[idx+1:]
+#题目和答案按照奇偶分布排列在list中
+def save_json(list1,url,json_file,init_index):
+    leng=len(list1)
+    i=0
+    save_json_content = []
+    while (i<leng):
+        result_json={
+            'id':init_index,
+            "question":delete_idx(list1[i]),
+            "answer":list1[i+1],
+            "url":url,
+            "keywords":[],
+            "category_path":[],
+            "picture":{}
+        }
+        save_json_content.append(result_json)
+        i=i+2
+        init_index=init_index+1
+    with open(json_path,'a') as f:
+        json.dump(save_json_content,f,ensure_ascii=False,indent=4)
+
+#两个列表只有问题和答案没有其他杂质
+def save_json1(list1,list2,url,json_file,init_index):
+    leng1=len(list1)
+    leng2=len(list2)
+    if leng1!=leng2:
+        return 0
+    i=0
+    save_json_content = []
+    while (i<leng1):
+        result_json={
+            'id':init_index,
+            "question":list1[i],
+            "answer":list2[i],
+            "url":url,
+            "keywords":[],
+            "category_path":[],
+            "picture":{}
+        }
+        save_json_content.append(result_json)
+        i=i+1
+        init_index=init_index+1
+    with open(json_path,'a') as f:
+        json.dump(save_json_content,f,ensure_ascii=False,indent=4)
+
+#答前面有一个空格，比如答前面有12个字符，idx=12，11的空格也不要，所以问题为0-11,答后有一个：，所以应该是14-last
+def divide_qa(list1):
+    question=[]
+    answer=[]
+    for str in list1:
+        print('正在读取答案')
+        idx=0
+        while str[idx]!='答':
+            idx=idx+1
+        question.append(delete_idx(str[0:idx-1]))
+        answer.append(str[idx+2:])
+    return question,answer
+#每一个模块以篇n开头，并且题目有序号
+def sava_qatogerher(url):
+    data=get_html(url)
+    content=get_tag(data)
+    list1=[]
+    real_list=[]
+    real=[]
+    for tag in content:
+        if(tag.string!=None):
+            list1.append(tag.string)
+
+    for tag in list1:
+        tag1=tag[2:]
+        real_list.append(tag1)
+
+    for i in real_list:
+        if(i[0]!='篇'):
+            real.append(i)
+    if os.path.exists(json_path):
+        init_index=len(read_json(json_path))
+    else:
+        init_index=0
+    save_json(list1=real,url=url,json_file=json_path,init_index=init_index)
+
+
+#以环保为开头的模块，并且题目和答案在列表的一个元素中，格式为    38、“低碳”主要是指什么? 答：节能减排
+def save_dividedqa(url):
+    data = get_html(url)
+    content = get_tag(data)
+    list = []
+    for tag in content:
+        if tag.string != None:
+            list.append(tag.string)
+    print('tag 获取完成')
+    list1 = []
+    for i in range(len(list)):
+        list1.append(list[i][2:])
+    print('去除空格完成')
+    print('获取第一部分问答')
+    qa1 = []
+    for i in list1[0:41]:
+        if i[0] != '环':
+            qa1.append(i)
+    print(qa1)
+    print(qa1[0][12])
+    # 答前面有一个空格，比如答前面有12个字符，idx=12，11的空格也不要，所以问题为0-11,答后有一个：，所以应该是14-last
+    question, answer = divide_qa(qa1)
+    if os.path.exists(json_path):
+        init_index=len(read_json(json_path))
+    else:
+        init_index=0
+    save_json1(question,answer,url,json_file=json_path,init_index=init_index)
+
+#save_dividedqa(url)
+sava_qatogerher(url)
